@@ -7,6 +7,7 @@ from jf1uids._physics_modules._cosmic_rays.cosmic_ray_options import CosmicRayCo
 from jf1uids._physics_modules._neural_net_force._neural_net_force_options import NeuralNetForceConfig
 from jf1uids._physics_modules._stellar_wind.stellar_wind_options import WindConfig
 from jf1uids._physics_modules._binary._binary_options import BinaryConfig
+from jf1uids._physics_modules._gravity_source._gravity_source_options import GravitySourceConfig
 
 from jaxtyping import Array, Float
 
@@ -236,6 +237,9 @@ class SimulationConfig(NamedTuple):
 
     #: The configuration for the binary system module.
     binary_config: BinaryConfig = BinaryConfig()
+
+    #: The configuration for the grav source system module.
+    gravity_source_config: GravitySourceConfig = GravitySourceConfig()
 
 
 def finalize_config(config: SimulationConfig, state_shape) -> SimulationConfig:
