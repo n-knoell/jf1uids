@@ -1,16 +1,23 @@
 # TOWNSEND SCHEME DOES NOT WORK CURRENTLY
-
 from functools import partial
 import jax
 import jax.numpy as jnp
 import numpy as np
+from typing import NamedTuple
 
-from jf1uids._physics_modules._cooling.cooling_options import PiecewisePowerLawParams
+# from jf1uids._physics_modules._cooling.cooling_options import PiecewisePowerLawParams
 from jf1uids.units.unit_helpers import CodeUnits
 
 from astropy import units as u
 import astropy.constants as c
 from astropy.constants import m_p
+
+class PiecewisePowerLawParams(NamedTuple):
+    log10_T_table: jnp.ndarray = jnp.array([])
+    log10_Lambda_table: jnp.ndarray = jnp.array([])
+    alpha_table: jnp.ndarray = jnp.array([])
+    Y_table: jnp.ndarray = jnp.array([])
+    reference_temperature: float = 1e8
 
 def schure_cooling(
     code_units: CodeUnits,

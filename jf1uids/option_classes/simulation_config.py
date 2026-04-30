@@ -7,6 +7,7 @@ from jf1uids._physics_modules._cosmic_rays.cosmic_ray_options import CosmicRayCo
 from jf1uids._physics_modules._neural_net_force._neural_net_force_options import NeuralNetForceConfig
 from jf1uids._physics_modules._stellar_wind.stellar_wind_options import WindConfig
 from jf1uids._physics_modules._binary._binary_options import BinaryConfig
+from jf1uids._physics_modules._turbulent_forcing._turbulent_forcing_options import TurbulentForcingConfig
 
 from jaxtyping import Array, Float
 
@@ -91,6 +92,34 @@ FIELD_TYPE = Union[
 
 # =============================================================
 
+
+class SnapshotSettings(NamedTuple):
+    """Settings for the snapshot output of the simulation."""
+
+    #: Whether to return states during the simulation.
+    return_states: bool = True
+
+    #: Whether to return the final state of the simulation.
+    return_final_state: bool = False
+
+    #: Whether to return the total mass at the times the snapshots were taken.
+    return_total_mass: bool = False
+
+    #: Whether to return the total energy at the times the snapshots were taken.
+    return_total_energy: bool = False
+
+    #: Whether to return internal energy
+    return_internal_energy: bool = False
+
+    #: Whether to return kinetic energy
+    return_kinetic_energy: bool = False
+
+    #: Whether to return gravitational energy
+    return_gravitational_energy: bool = False
+
+    #: Whether to return radial momentum
+    return_radial_momentum: bool = False
+
 class BoundarySettings1D(NamedTuple):
     left_boundary: int = OPEN_BOUNDARY
     right_boundary: int = OPEN_BOUNDARY
@@ -113,6 +142,10 @@ class SimulationConfig(NamedTuple):
     #: on e.g. negative pressure or density.
     #: Significantly reduces performance.
     runtime_debugging: bool = False
+
+    #: Memory analysis of the main time integration
+    #: function
+    memory_analysis: bool = False
 
     #: Activate progress bar
     progress_bar: bool = False
@@ -207,6 +240,9 @@ class SimulationConfig(NamedTuple):
     #: instead of only the final fluid state.
     return_snapshots: bool = False
 
+    #: Snapshot settings
+    snapshot_settings: SnapshotSettings = SnapshotSettings()
+
     #: Call a user given function on the snapshot data,
     #: e.g. for saving or plotting. Must have signature
     #: callback(time, state, registered_variables).
@@ -214,7 +250,6 @@ class SimulationConfig(NamedTuple):
 
     #: Return snapshots at specific time points.
     use_specific_snapshot_timepoints: bool = False
-    specific_snapshot_timepoints: tuple = ()
 
     #: The number of snapshots to return.
     num_snapshots: int = 10
@@ -242,6 +277,8 @@ class SimulationConfig(NamedTuple):
     #: The configuration for the binary system module.
     binary_config: BinaryConfig = BinaryConfig()
 
+    #: Turbulent forcing configuration.
+    turbulent_forcing_config: TurbulentForcingConfig = TurbulentForcingConfig()
 
 def finalize_config(config: SimulationConfig, state_shape) -> SimulationConfig:
     """Finalizes the simulation configuration."""

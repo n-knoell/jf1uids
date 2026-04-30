@@ -1,5 +1,5 @@
 """
-Plummer sampler for N-body initial conditions (3D).
+Plummer sampler for N-body initial conditions in 3d
 
 Generates positions from a Plummer sphere and samples velocities from the
 local Plummer velocity distribution using rejection sampling. It then
@@ -7,18 +7,13 @@ rescales velocities to reach a target virial ratio Q (default 0.5) and
 optionally enforces a confinement box [-a,a]^3 by a similarity rescale.
 
 Returns:
-    txv : jnp.array shape (n,7) -- rows [t, x, y, z, vx, vy, vz]
-    masses : jnp.array shape (n,) -- masses for each particle
+    txv : jnp.array - [t, x, y, z, vx, vy, vz]
+    masses : jnp.array - masses for each particle
 
-Uses numpy for the sampler and converts results to jax.numpy (jnp)
-for the requested output format.
-
-Notes:
-- G defaults to 1.0. If you use a different G in your integrator, either
-  change G here or scale positions/velocities consistently.
-- The Plummer scale `b` defaults to a/2 so that most mass lies well
-  within the box radius `a`. Change `b` if you want a more/less
-  concentrated distribution.
+G defaults to 1.0.
+The Plummer scale `b` defaults to a/2 so that most mass lies well
+within the box radius `a`. Change `b` if you want a more/less
+concentrated distribution.
 
 Example:
     txv, m = plummer_sampler(n=100, M1=0.8, M2=1.2, a=1.0, seed=42)
@@ -32,22 +27,13 @@ from typing import Tuple, Any
 from functools import partial
 
 
-# ------------------------------
-# Helper utilities
-# ------------------------------
 def _pairwise_distances(positions: jnp.ndarray, softening: float = 0.0) -> jnp.ndarray:
     """
     positions: (n,3)
-    returns r_ij (n,n) with diagonal set large to avoid self-interaction
     """
-    diff = positions[:, None, :] - positions[None, :, :]  # (n,n,3)
+    diff = positions[:, None, :] - positions[None, :, :] 
     r2 = jnp.sum(diff ** 2, axis=-1)
-    if softening > 0.0:
-        r = jnp.sqrt(r2 + softening ** 2)
-    else:
-        # avoid sqrt(0) on diagonal by adding tiny epsilon; we'll set diagonal large below anyway
-        r = jnp.sqrt(r2 + 0.0)
-    # set diagonal to large value so it doesn't contribute to pair sums
+    r = jnp.sqrt(r2 + softening ** 2)
     r = r + jnp.eye(positions.shape[0]) * 1e30
     return r
 
@@ -71,7 +57,7 @@ def _pack_orbits(pos: jnp.ndarray, vel: jnp.ndarray, t0: float = 0.0) -> jnp.nda
 # ------------------------------
 # @partial(jit, static_argnums=("n", "mass_dist"))
 def plummer_sampler(n: int,
-                    key: Any,             # keep this generic to avoid KeyArray errors across JAX versions
+                    key: Any,             
                     M1: float = 1.0,
                     M2: float = 1.0,
                     mass_dist: str = "uniform",   # "uniform" or "powerlaw"
@@ -82,14 +68,12 @@ def plummer_sampler(n: int,
                    ) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """
     Returns:
-        orbits: jnp.ndarray shape (n,7) rows [t0, x,y,z, vx,vy,vz]
-        masses: jnp.ndarray shape (n,)
+        orbits: [t0, x,y,z, vx,vy,vz]
+        masses: shape (n,)
     Notes:
         - G = 1 units
         - velocities are scaled so that 2*T + U = 0 (global virial equilibrium)
-        - O(n^2) potential calculation
     """
-    # --- split PRNG key up front and use the pieces ---
     k1, k2, k3, k4 = jax.random.split(key, 4)
 
     # --- sample masses ---
@@ -119,7 +103,7 @@ def plummer_sampler(n: int,
     dirs = xyz / norms
     pos = dirs * r[:, None]  # (n,3)
 
-    # --- sample velocities isotropically (initial guess) ---
+    # sample velocities isotropically (initial guess)
     vel_raw = jax.random.normal(k4, (n, 3))
 
     # compute current kinetic energy T0 with this raw velocity (scale=1)
@@ -148,14 +132,10 @@ def plummer_sampler(n: int,
     return orbits, masses
 
 # ------------------------------
-# Example usage (not inside jit)
-# ------------------------------
+# Example usage
 # key = jax.random.PRNGKey(1234)
 # orbits, masses = plummer_sampler(n=128, key=key, M1=0.5, M2=2.0, mass_dist="uniform", a=1.0)
 # print(orbits.shape, masses.shape)
-
-
-
 
 """
 Simple virialized sphere sampler for N-body initial conditions (3D).
@@ -168,17 +148,11 @@ drawn from a Maxwell-like distribution and then globally rescaled to
 achieve the virial ratio.
 
 Returns:
-    txv : jnp.array shape (n,7) -- rows [t, x, y, z, vx, vy, vz]
-    masses : jnp.array shape (n,) -- masses for each particle
-
-Notes:
-- Uses numpy for sampling and converts outputs to jax.numpy (jnp).
-- G defaults to 1.0. If you want a different gravitational constant,
-  set G accordingly or rescale positions/velocities consistently.
+    txv: [t, x, y, z, vx, vy, z]
+    masses: masses for each particle
 
 Example:
     txv, m = virialized_sphere_sampler(100, 0.8, 1.2, a=1.0, R=0.9, seed=1)
-
 """
 
 from typing import Tuple, Optional
@@ -227,12 +201,10 @@ def virialized_sphere_sampler(
     -------
     txv : jnp.ndarray shape (n,7)
     masses_jnp : jnp.ndarray shape (n,)
-
     """
 
     rng = np.random.default_rng(seed)
 
-    # --- masses
     if masses is None:
         masses_np = rng.uniform(low=M1, high=M2, size=n).astype(float)
     else:
@@ -242,7 +214,6 @@ def virialized_sphere_sampler(
 
     M_tot = masses_np.sum()
 
-    # --- choose radius
     if R is None:
         R = 0.9 * a
 

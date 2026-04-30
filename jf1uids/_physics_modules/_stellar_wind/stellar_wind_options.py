@@ -1,4 +1,4 @@
-from typing import NamedTuple
+from typing import NamedTuple, Union
 import jax.numpy as jnp
 
 # wind injection schemes
@@ -14,8 +14,8 @@ class WindConfig(NamedTuple):
     real_wind_params: bool = False
 
 class WindParams(NamedTuple):
-    wind_mass_loss_rates: jnp.array = None
-    wind_final_velocities: jnp.array = None
+    wind_mass_loss_rates: jnp.array = None #Union[jnp.array, float]  #
+    wind_final_velocities: jnp.array = None #Union[jnp.array, float]
     wind_injection_positions: jnp.array = jnp.array([[0.0, 0.0, 0.0]])
     real_params: jnp.array = None
     # only necesarry for the MEO injection scheme

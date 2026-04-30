@@ -51,18 +51,13 @@ def acceleration(positions: jnp.ndarray, masses: jnp.ndarray, eps: float = 1e-12
     returns: acc shape (n,3) where acc[i] = sum_{j != i} - masses[j] * (r_i - r_j) / |r_i - r_j|^3
     (G is assumed 1, consistent with original code's unit treatment)
     """
-            # positions[:, None, :] - positions[None, :, :] -> shape (n,n,3) where diff[i,j] = r_i - r_j
     diff = positions[:, None, :] - positions[None, :, :]  # (n, n, 3)
     r2 = jnp.sum(diff ** 2, axis=-1)  # (n, n)
-    # Avoid dividing by zero on the diagonal by adding small eps
     inv_r3 = jnp.where(r2 > 0, 1.0 / (r2 * jnp.sqrt(r2) + eps), 0.0)  # (n, n)
-    # mass-weighted factor for each pair (broadcast masses[j] over i)
     mass_factors = masses[None, :]  # (1, n)
     # acceleration contribution from j on i: - mass_j * diff_ij * inv_r3_ij
     contrib = - (mass_factors[..., None] * diff) * inv_r3[..., None]  # (n, n, 3)
-    # zero out self-contrib (diagonal) in case numerical nonzero
     contrib = contrib * (1.0 - jnp.eye(positions.shape[0])[:, :, None])
-    # sum over j
     acc = jnp.sum(contrib, axis=1)  # (n, 3)
     return acc
 
@@ -80,11 +75,11 @@ def rk4_step_nbody(state: jnp.ndarray, h: float, masses: jnp.ndarray):
     def deriv(s):
         # s shape (n,7)
         n = s.shape[0]
-        dt_col = jnp.ones((n, 1), dtype=s.dtype)  # time derivative (1 per body)
-        positions = s[:, 1:4]  # (n,3)
-        velocities = s[:, 4:7]  # (n,3)
-        acc = acceleration(positions, masses)  # (n,3)
-        return jnp.concatenate([dt_col, velocities, acc], axis=1)  # (n,7)
+        dt_col = jnp.ones((n, 1), dtype=s.dtype)  # time derivative
+        positions = s[:, 1:4]  
+        velocities = s[:, 4:7]  
+        acc = acceleration(positions, masses)  
+        return jnp.concatenate([dt_col, velocities, acc], axis=1)  
 
     k1 = deriv(state)
     k2 = deriv(state + hh * k1)
@@ -113,7 +108,7 @@ def _deposit_particles_ngp(
     # map world->grid indices by subtracting the minimum corner:
     idx = ((particle_positions - grid_min) // grid_spacing).astype(int)
     idx = jnp.clip(idx, 0, jnp.array(grid_shape) - 1)
-    # Flatten grid and scatter-add masses
+    # Flatten grid and add masses
     flat_idx = idx[:,0] * (grid_shape[1]*grid_shape[2]) + idx[:,1] * grid_shape[2] + idx[:,2]
     rho_flat = jnp.zeros(grid_shape[0]*grid_shape[1]*grid_shape[2])
     rho_flat = rho_flat.at[flat_idx].add(particle_densities)
@@ -143,14 +138,14 @@ def _deposit_particles_cic(
     offsets = jnp.array([
         [0,0,0],[0,0,1],[0,1,0],[0,1,1],
         [1,0,0],[1,0,1],[1,1,0],[1,1,1],
-    ], dtype=jnp.int32)                                   # (8,3)
+    ], dtype=jnp.int32)                                  
 
     neigh_idx = i0[:, None, :] + offsets[None, :, :]
     # clip indices to grid boundaries (non-periodic)
     max_idx = jnp.array([nx - 1, ny - 1, nz - 1], dtype=jnp.int32)
     neigh_idx = jnp.clip(neigh_idx, 0, max_idx)
     # weights: for each dim weight is (1-f) if offset==0 else f; multiply over dims -> (N,8)
-    f_b = f[:, None, :]                                   # (N,1,3)
+    f_b = f[:, None, :]                                  
     # boolean mask of offsets==0 broadcasted -> choose (1-f) or f
     w_comp = jnp.where(offsets[None, :, :] == 0, 1.0 - f_b, f_b)  
     weights = jnp.prod(w_comp, axis=-1)                  
@@ -158,7 +153,6 @@ def _deposit_particles_cic(
     flat_idx = (neigh_idx[..., 0] * (ny * nz)
                 + neigh_idx[..., 1] * nz
                 + neigh_idx[..., 2])                      
-    # flatten for scatter
     flat_idx_flat = flat_idx.reshape(-1)                  
     values_flat = (particle_densities[:, None] * weights).reshape(-1)  
     n_cells = nx * ny * nz                               
@@ -185,7 +179,6 @@ def _deposit_particles_tsc(
     grid_extent = jnp.array([nx, ny, nz]) * grid_spacing
     grid_min = -0.5 * grid_extent   
     particle_densities = particle_masses / (grid_spacing ** 3) 
-    # continuous position in grid units 
     rel = (particle_positions - grid_min) / grid_spacing   
     # floor(rel) gives a central index; neighbors are floor(rel)-1, floor(rel), floor(rel)+1
     i_center = jnp.floor(rel).astype(jnp.int32)           
@@ -194,7 +187,6 @@ def _deposit_particles_tsc(
                          for i in (-1, 0, 1)
                          for j in (-1, 0, 1)
                          for k in (-1, 0, 1)], dtype=jnp.int32)   
-    # neighbor indices (N,27,3)
     neigh_idx = i_center[:, None, :] + offsets[None, :, :]   
     max_idx = jnp.array([nx - 1, ny - 1, nz - 1], dtype=jnp.int32)
     neigh_idx = jnp.clip(neigh_idx, 0, max_idx)
@@ -214,7 +206,7 @@ def _deposit_particles_tsc(
     wy = W1D_from_s(s[..., 1])   
     wz = W1D_from_s(s[..., 2])   
     weights = wx * wy * wz      
-    # Flatten neighbor flat indices and weighted mass values for scatter
+
     flat_idx = (neigh_idx[..., 0] * (ny * nz)
                 + neigh_idx[..., 1] * nz
                 + neigh_idx[..., 2])                    
@@ -227,6 +219,254 @@ def _deposit_particles_tsc(
 
     return rho_flat.reshape((nx, ny, nz))
 
+
+@jit
+def binary_starting_orbits(sep: float,
+                           e: float,
+                           inc_deg: float,
+                           m1: float,
+                           m2: float,
+                           true_anom_deg: float = 0.0,
+                           G: float = 1.0):
+    """
+    Construct initial state vectors [t, x, y, z, vx, vy, vz] for a binary system
+    - sep: semi-major axis a
+    - e: eccentricity (0 <= e < 1 for elliptic)
+    - inc_deg: inclination in degrees (rotation about x-axis). Position stays on x-axis.
+    - m1, m2: masses
+    - true_anom_deg: starting true anomaly (degrees); default = 0 -> periapsis (relative position on +x)
+    - G: gravitational constant (default 1)
+    Returns: jnp.array shape (2,7) where each row is [t, x, y, z, vx, vy, vz]
+    Notes:
+      - Positions are given in the center-of-mass frame (COM at origin).
+      - By construction initial positions have only an x-component (y=z=0).
+    """
+
+    # convert angles
+    i = jnp.deg2rad(inc_deg)
+    f = jnp.deg2rad(true_anom_deg)
+
+    # semi-major axis
+    a = sep
+
+    mu = G * (m1 + m2)
+
+    # radial distance at true anomaly f
+    r = a * (1.0 - e**2) / (1.0 + e * jnp.cos(f))
+
+    # specific angular momentum
+    h = jnp.sqrt(mu * a * (1.0 - e**2))
+
+    # velocity components in perifocal (r, theta, z=0)
+    v_r = (mu / h) * e * jnp.sin(f)
+    v_theta = (mu / h) * (1.0 + e * jnp.cos(f))
+
+    # position and velocity in perifocal coords (relative vector)
+    r_pf = jnp.array([r, 0.0, 0.0], dtype=jnp.float64)
+    v_pf = jnp.array([v_r, v_theta, 0.0], dtype=jnp.float64)
+
+    # rotation about x-axis by inclination i (perifocal -> inertial, with Omega=omega=0)
+    ci = jnp.cos(i)
+    si = jnp.sin(i)
+    R_x = jnp.array([[1.0, 0.0, 0.0],
+                     [0.0, ci, -si],
+                     [0.0, si,  ci]], dtype=jnp.float64)
+
+    r_eci = R_x @ r_pf
+    v_eci = R_x @ v_pf
+
+    # split into two-body COM coordinates (COM at origin)
+    r1 = - (m2 / (m1 + m2)) * r_eci
+    r2 =   (m1 / (m1 + m2)) * r_eci
+    v1 = - (m2 / (m1 + m2)) * v_eci
+    v2 =   (m1 / (m1 + m2)) * v_eci
+
+    orbit1 = jnp.concatenate([jnp.array([0.0]), r1, v1])  # [t, x, y, z, vx, vy, vz]
+    orbit2 = jnp.concatenate([jnp.array([0.0]), r2, v2])
+
+    return jnp.stack([orbit1, orbit2])
+
+
+
+@jit
+def _eccentric_from_true_anomaly(f, e):
+    """
+    E = 2*arctan( sqrt((1-e)/(1+e)) * tan(f/2) )
+    Handles f near ±pi robustly via atan2 formulation.
+    """
+    # Use half-angle formulation with atan2 to reduce issues with quadrants.
+    s = jnp.sqrt((1.0 - e) / (1.0 + e))
+    t_half = jnp.tan(0.5 * f)
+    E = 2.0 * jnp.arctan(s * t_half)
+    # Ensure E is continuous (map to principal branch)
+    return E
+
+@jit
+def _solve_kepler_newton(M, e, n_iter=30):
+    """
+    Solve M = E - e*sin(E) for E using Newton iterations.
+    M, e are scalars. Uses a good analytic initial guess.
+    """
+    # initial guess using Fourier series / first terms
+    E0 = M + e * jnp.sin(M) + 0.5 * (e**2) * jnp.sin(2.0 * M)
+
+    def body_fun(i, E):
+        f = E - e * jnp.sin(E) - M
+        fp = 1.0 - e * jnp.cos(E)
+        E_new = E - f / fp
+        return E_new
+
+    E_final = lax.fori_loop(0, n_iter, body_fun, E0)
+    return E_final
+
+@jit
+def binary_starting_orbits_at_phase(sep: float,
+                           e: float,
+                           inc_deg: float,
+                           m1: float,
+                           m2: float,
+                           phi: float = 0.0,
+                           true_anom_deg: float = 0.0,
+                           G: float = 1.0):
+    """
+    Construct state vectors [t, x, y, z, vx, vy, vz] for a binary at orbital phase `phi`.
+    - sep: semi-major axis a
+    - e: eccentricity (0 <= e < 1 for elliptic)
+    - inc_deg: inclination in degrees (rotation about x-axis). Positions are rotated about x.
+    - m1, m2: masses
+    - phi: orbital phase in [0,1). phi=0 corresponds to true_anom_deg at time zero.
+    - true_anom_deg: true anomaly at phase phi=0 (degrees). Default 0 -> periapsis on +x.
+    - G: gravitational constant (default 1)
+    Returns: jnp.array shape (2,7) where each row is [t, x, y, z, vx, vy, vz]
+    Notes:
+      - Positions/velocities are returned in the center-of-mass frame (COM at origin).
+      - By construction the initial reference periapsis (phi=0, true_anom_deg=0) lies on +x.
+    """
+
+    # convert angles and scalars
+    i = jnp.deg2rad(inc_deg)
+    f0 = jnp.deg2rad(true_anom_deg)
+    a = sep
+    mu = G * (m1 + m2)
+
+    # 1) compute eccentric anomaly at phi=0 from provided true anomaly f0
+    # handle circular case e==0 specially to avoid divisions by zero
+    E0 = jnp.where(e == 0.0, f0, _eccentric_from_true_anomaly(f0, e))
+
+    # 2) compute mean anomaly at phi=0
+    M0 = E0 - e * jnp.sin(E0)
+
+    # 3) advance mean anomaly by 2*pi*phi (wrap phi into [0,1))
+    phi_wrap = phi - jnp.floor(phi)
+    M_target = M0 + 2.0 * jnp.pi * phi_wrap
+
+    # 4) solve Kepler's equation for target eccentric anomaly E_target
+    E = _solve_kepler_newton(M_target, e, n_iter=40)
+
+    # 5) compute position in perifocal coordinates from E
+    cosE = jnp.cos(E)
+    sinE = jnp.sin(E)
+    sqrt_1_e2 = jnp.sqrt(jnp.maximum(0.0, 1.0 - e**2))
+
+    # Perifocal position (relative) (x_pf, y_pf, 0)
+    x_pf = a * (cosE - e)
+    y_pf = a * sqrt_1_e2 * sinE
+    r_pf = jnp.array([x_pf, y_pf, 0.0])
+
+    # Perifocal velocity (relative)
+    # factor = sqrt(mu / a) / (1 - e*cosE)
+    factor = jnp.sqrt(mu / a) / (1.0 - e * cosE)
+    vx_pf = - factor * sinE
+    vy_pf =   factor * sqrt_1_e2 * cosE
+    v_pf = jnp.array([vx_pf, vy_pf, 0.0])
+
+    # 6) rotate by inclination about x-axis (perifocal -> inertial, with Omega=omega=0)
+    ci = jnp.cos(i)
+    si = jnp.sin(i)
+    R_x = jnp.array([[1.0, 0.0, 0.0],
+                     [0.0, ci, -si],
+                     [0.0, si,  ci]])
+
+    r_eci = R_x @ r_pf
+    v_eci = R_x @ v_pf
+
+    # 7) split into two-body COM coordinates (COM at origin)
+    r1 = - (m2 / (m1 + m2)) * r_eci
+    r2 =   (m1 / (m1 + m2)) * r_eci
+    v1 = - (m2 / (m1 + m2)) * v_eci
+    v2 =   (m1 / (m1 + m2)) * v_eci
+
+    orbit1 = jnp.concatenate([jnp.array([0.0]), r1, v1])  # [t, x, y, z, vx, vy, vz]
+    orbit2 = jnp.concatenate([jnp.array([0.0]), r2, v2])
+
+    return jnp.concatenate([orbit1, orbit2])
+
+@jit
+def kepler_period(a: float, m1: float, m2: float, G: float = 1.0):
+    return 2.0 * jnp.pi * jnp.sqrt(a**3 / (G * (m1 + m2)))
+
+@jit
+def positions_at_phase_kepler(traj: jnp.ndarray,
+                              phi: float,
+                              a: float,
+                              m1: float,
+                              m2: float,
+                              G: float = 1.0):
+    """
+    Return positions (x,y,z) of both stars at orbital phase phi (0..1)
+    using analytic Kepler period.
+    """
+    times = traj[:, 0, 0]
+    period = kepler_period(a, m1, m2, G)
+
+    phi = phi - jnp.floor(phi)  # wrap
+    target_time = times[0] + phi * period
+
+    j = jnp.searchsorted(times, target_time, side="right") - 1
+    j = jnp.clip(j, 0, traj.shape[0] - 2)
+
+    t0 = times[j]
+    t1 = times[j + 1]
+    alpha = (target_time - t0) / (t1 - t0)
+
+    # positions
+    pos0 = traj[j, :, 1:4]
+    pos1 = traj[j + 1, :, 1:4]
+
+    # velocities
+    vel0 = traj[j, :, 4:7]
+    vel1 = traj[j + 1, :, 4:7]
+
+    pos_phi = (1.0 - alpha) * pos0 + alpha * pos1
+    vel_phi = (1.0 - alpha) * vel0 + alpha * vel1
+
+    return pos_phi, vel_phi
+
+@jaxtyped(typechecker=typechecker)
+@partial(jax.jit, static_argnames=['config'])
+def binary_partial(
+    primitive_state: STATE_TYPE,
+    config: SimulationConfig,
+    params: SimulationParams,
+    dt: Float[Array, ""],
+    binary_state: Union[None, Float[Array, "n"]] = None
+    ) -> Float[Array, "n"]:   
+
+    particle_masses = params.binary_params.masses
+    if config.binary_config.central_object_only == False:
+        if binary_state.ndim == 1:
+            n_bodies = particle_masses.size
+            state = binary_state.reshape((n_bodies, 7)) 
+        else:
+            state = binary_state         
+        new_state = rk4_step_nbody(state, dt, particle_masses)  
+        particle_positions = new_state[:, 1:4]
+        new_state = new_state.reshape(-1)
+    elif config.binary_config.central_object_only == True:
+        particle_positions = jnp.zeros((1, config.dimensionality))
+        new_state = jnp.array([0.0,0.0,0.0,0.0,0.0,0.0,0.0])
+    
+    return new_state
 
 @jaxtyped(typechecker=typechecker)
 @partial(jax.jit, static_argnames=['config', 'registered_variables'])
@@ -306,7 +546,7 @@ def integrate_nbody(orbits: jnp.ndarray, masses: jnp.ndarray, h: float, T: float
     T: total integration time
     returns: traj_com shape (num_steps, n, 7) positions/velocities in COM frame
     """
-    state0 = orbits  # (n,7)
+    state0 = orbits  
     num_steps = int(jnp.ceil(T / h))
     n = state0.shape[0]
     totalM = jnp.sum(masses)
@@ -314,7 +554,7 @@ def integrate_nbody(orbits: jnp.ndarray, masses: jnp.ndarray, h: float, T: float
     @jit
     def run_with_fori_loop(state0):
         def body_fn(i, carry):
-            state, traj = carry  # state (n,7), traj (num_steps, n, 7)
+            state, traj = carry  
             new_state = rk4_step_nbody(state, h, masses)
             traj = traj.at[i].set(new_state)
             return new_state, traj
@@ -329,15 +569,12 @@ def integrate_nbody(orbits: jnp.ndarray, masses: jnp.ndarray, h: float, T: float
     print(f"n-body RK4 took {t1 - t0:.4f} seconds")
 
     # Transform trajectories into center-of-mass frame (positions only; times/vels adjusted)
-    # Compute center of mass position at every timestep: COM(t) = sum_i m_i * pos_i(t) / totalM
     positions = traj[:, :, 1:4]  # (num_steps, n, 3)
-    # Broadcast masses to multiply across timesteps
-    weighted = positions * masses[None, :, None]  # (num_steps, n, 3)
-    COM = jnp.sum(weighted, axis=1) / totalM  # (num_steps, 3)
+    weighted = positions * masses[None, :, None]  
+    COM = jnp.sum(weighted, axis=1) / totalM  
     # Subtract COM from each body's positions for all timesteps
-    positions_com = positions - COM[:, None, :]  # (num_steps, n, 3)
+    positions_com = positions - COM[:, None, :] 
 
-    # Build traj_com by replacing positions with COM-subtracted positions
     traj_com = traj.at[:, :, 1:4].set(positions_com)
 
     return traj_com
@@ -379,20 +616,19 @@ def plot_3d_trajectories(traj,
     - show_initial: if True mark initial positions with larger markers
     """
 
-    traj = np.asarray(traj)  # convert JAX arrays if needed
+    traj = np.asarray(traj)  
     num_steps, n, _ = traj.shape
 
     fig = plt.figure(figsize=figsize)
 
     def _plot_on_axis(ax, data, subtitle):
-        # data shape: (num_steps, n, 7)
         for i in range(n):
-            xs = data[:, i, 1]  # x
-            ys = data[:, i, 2]  # y
-            zs = data[:, i, 3]  # z
+            xs = data[:, i, 1]  
+            ys = data[:, i, 2]  
+            zs = data[:, i, 3]  
             ax.plot(xs, ys, zs, linewidth=1, label=f'body {i}')
             if show_initial:
-                ax.scatter(xs[0], ys[0], zs[0], s=40)  # initial point
+                ax.scatter(xs[0], ys[0], zs[0], s=40)  # initial
         ax.set_xlabel("x"); ax.set_ylabel("y"); ax.set_zlabel("z")
         ax.set_title(subtitle)
         ax.view_init(elev=elev, azim=azim)
@@ -433,7 +669,7 @@ def quantity_test(orbit1, orbit2, M1, M2, h, T):
 
 if __name__ == "__main__":
     jax.config.update('jax_enable_x64', True)
-    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 (needed for 3D projection)
+    from mpl_toolkits.mplot3d import Axes3D  
     import numpy as np
 
     orbit1 = jnp.array([0.0, 0.3, 0.0, 0.0, 0.0, 0.6, 0.0])

@@ -34,9 +34,15 @@ def magnetic_update(magnetic_field, gas_state, grid_spacing, dt, registered_vari
         The updated magnetic field.
     """
 
-    # retrieve the velocity
-    velocity = jnp.zeros((3, *gas_state.shape[1:]), dtype = magnetic_field.dtype)
-    velocity = velocity.at[0:2, :, :].set(gas_state[registered_variables.velocity_index.x:registered_variables.velocity_index.x + 2, ...])
+    if config.dimensionality == 2:
+        # retrieve the velocity
+        # THIS IS ONLY WRITTEN FOR 2D!!!!!
+        velocity = jnp.zeros((3, *gas_state.shape[1:]), dtype = magnetic_field.dtype)
+        velocity = velocity.at[0:2, :, :].set(gas_state[registered_variables.velocity_index.x:registered_variables.velocity_index.x + 2, ...])
+    elif config.dimensionality == 3:
+        velocity = gas_state[registered_variables.velocity_index.x:registered_variables.velocity_index.x + 3, ...]
+    else:
+        raise ValueError("No 1D MHD.")
 
     density = gas_state[registered_variables.density_index, ...]
 
@@ -88,7 +94,7 @@ def magnetic_update(magnetic_field, gas_state, grid_spacing, dt, registered_vari
             jnp.max(jnp.linalg.norm(B_k - B_kp1, axis=0)),
             jnp.max(jnp.linalg.norm(v_k - v_kp1, axis=0))
         )
-        return (max_change > 1e-10) & (current_iter < 1000)
+        return (max_change > 1e-5) & (current_iter < 1000)
 
     def while_body(state):
         B_k, v_k, B_kp1, v_kp1, current_iter = state
@@ -134,7 +140,11 @@ def magnetic_update(magnetic_field, gas_state, grid_spacing, dt, registered_vari
     pressure_updated = pressure_from_energy(gas_energy_updated, density, jnp.linalg.norm(v_n, axis = 0), 5/3)
     
     # update the gas state
-    gas_state = gas_state.at[registered_variables.velocity_index.x:registered_variables.velocity_index.x + 2, ...].set(v_n[:2, ...])
+    if config.dimensionality == 2:
+        gas_state = gas_state.at[registered_variables.velocity_index.x:registered_variables.velocity_index.x + 2, ...].set(v_n[:2, ...])
+    elif config.dimensionality == 3:
+        gas_state = gas_state.at[registered_variables.velocity_index.x:registered_variables.velocity_index.x + 3, ...].set(v_n)
+
     gas_state = gas_state.at[registered_variables.pressure_index, ...].set(pressure_updated)
 
     return B_n, gas_state

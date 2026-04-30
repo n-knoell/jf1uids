@@ -7,6 +7,7 @@ from jf1uids._physics_modules._cosmic_rays.cosmic_ray_options import CosmicRayPa
 from jf1uids._physics_modules._neural_net_force._neural_net_force_options import NeuralNetForceParams
 from jf1uids._physics_modules._stellar_wind.stellar_wind_options import WindParams
 from jf1uids._physics_modules._binary._binary_options import BinaryParams
+from jf1uids._physics_modules._turbulent_forcing._turbulent_forcing_options import TurbulentForcingParams
 
 class SimulationParams(NamedTuple):
     """
@@ -53,3 +54,6 @@ class SimulationParams(NamedTuple):
 
     #: The parameters of the binary module.
     binary_params: BinaryParams = BinaryParams()
+
+    #: The parameters of the turbulent forcing module.
+    turbulent_forcing_params: TurbulentForcingParams = TurbulentForcingParams()

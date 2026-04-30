@@ -24,6 +24,7 @@ from jf1uids.option_classes.simulation_params import SimulationParams
 # ======= Create the primitive state ========
 
 @jaxtyped(typechecker=typechecker)
+@partial(jax.jit, static_argnames=['registered_variables', 'config', 'sharding'])
 def construct_primitive_state(
 
     config: SimulationConfig,
@@ -38,6 +39,8 @@ def construct_primitive_state(
     magnetic_field_z: Union[FIELD_TYPE, NoneType] = None,
     gas_pressure: Union[FIELD_TYPE, NoneType] = None,
     cosmic_ray_pressure: Union[FIELD_TYPE, NoneType] = None,
+
+    sharding = None,
 
 ) -> STATE_TYPE:
 
@@ -62,8 +65,14 @@ def construct_primitive_state(
     Returns:
         The state array.
     """
-
-    state = jnp.zeros((registered_variables.num_vars, *density.shape))
+    if sharding is not None:
+        state = jax.lax.with_sharding_constraint(
+            jnp.zeros((registered_variables.num_vars, *density.shape)), 
+            sharding
+        )
+    else:
+        state = jnp.zeros((registered_variables.num_vars, *density.shape))
+    
     state = state.at[registered_variables.density_index].set(density)
 
     if config.dimensionality == 1:
@@ -96,39 +105,6 @@ def construct_primitive_state(
 
     return state
 
-
-@jaxtyped(typechecker=typechecker)
-@partial(jax.jit, static_argnames=['registered_variables'])
-def construct_primitive_state3D(
-    rho: Float[Array, "num_cells num_cells num_cells"],
-    u_x: Float[Array, "num_cells num_cells num_cells"],
-    u_y: Float[Array, "num_cells num_cells num_cells"],
-    u_z: Float[Array, "num_cells num_cells num_cells"],
-    p: Float[Array, "num_cells num_cells num_cells"],
-    registered_variables: RegisteredVariables
-) -> Float[Array, "num_vars num_cells num_cells num_cells"]:
-    """Stack the primitive variables into the state array.
-    
-    Args:
-        rho: The density of the fluid.
-        u: The velocity of the fluid.
-        p: The pressure of the fluid.
-        registered_variables: The indices of the variables in the state array.
-        
-    Returns:
-        The state array.
-    """
-
-    state = jnp.zeros((registered_variables.num_vars, rho.shape[0], rho.shape[1], rho.shape[2]))
-    state = state.at[registered_variables.density_index].set(rho)
-
-    state = state.at[registered_variables.velocity_index.x].set(u_x)
-    state = state.at[registered_variables.velocity_index.y].set(u_y)
-    state = state.at[registered_variables.velocity_index.z].set(u_z)
-
-    state = state.at[registered_variables.pressure_index].set(p)
-
-    return state
 
 @jaxtyped(typechecker=typechecker)
 @partial(jax.jit, static_argnames=['config', 'registered_variables'])
@@ -164,7 +140,7 @@ def primitive_state_from_conserved(
         ux = conserved_state[registered_variables.velocity_index.x] / rho
         uy = conserved_state[registered_variables.velocity_index.y] / rho
         uz = conserved_state[registered_variables.velocity_index.z] / rho
-        u = jnp.sqrt(ux**2 + uy**2 + uz**2)
+        u = jnp.sqrt(ux**2 + uy**2 + uz**2 + 1e-20)  # avoid zero velocity
 
     p = pressure_from_energy(E, rho, u, gamma)
 
@@ -266,7 +242,7 @@ def get_absolute_velocity(
     elif config.dimensionality == 2:
         return jnp.sqrt(primitive_state[registered_variables.velocity_index.x]**2 + primitive_state[registered_variables.velocity_index.y]**2)
     elif config.dimensionality == 3:
-        return jnp.sqrt(primitive_state[registered_variables.velocity_index.x]**2 + primitive_state[registered_variables.velocity_index.y]**2 + primitive_state[registered_variables.velocity_index.z]**2)
+        return jnp.sqrt(primitive_state[registered_variables.velocity_index.x]**2 + primitive_state[registered_variables.velocity_index.y]**2 + primitive_state[registered_variables.velocity_index.z]**2 + 1e-20)
     else:
         raise ValueError("Invalid dimension.")
 

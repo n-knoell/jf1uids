@@ -23,7 +23,7 @@ from jf1uids._physics_modules._binary._binary_options import BinaryParams
 
 from typing import Union
 
-@jaxtyped(typechecker=typechecker)
+# @jaxtyped(typechecker=typechecker)
 @partial(jax.jit, static_argnames=['config', 'registered_variables'])
 def _wind_injection(
     primitive_state: STATE_TYPE,
@@ -165,7 +165,7 @@ def _wind_ei(wind_params: WindParams, primitive_state: Float[Array, "num_vars nu
     # V = jnp.sum(helper_data.cell_volumes[num_ghost_cells:num_injection_cells + num_ghost_cells])
 
     # mass injection
-    drho_dt = wind_params.wind_mass_loss_rate / V
+    drho_dt = wind_params.wind_mass_loss_rates / V
     source_term = source_term.at[0, num_ghost_cells:num_injection_cells + num_ghost_cells].set(drho_dt)
     updated_density = primitive_state[0, num_ghost_cells:num_injection_cells + num_ghost_cells] + drho_dt * dt
 
@@ -173,7 +173,7 @@ def _wind_ei(wind_params: WindParams, primitive_state: Float[Array, "num_vars nu
         source_term = source_term.at[registered_variables.wind_density_index, num_ghost_cells:num_injection_cells + num_ghost_cells].set(drho_dt)
 
     # energy injection
-    dE_dt = 0.5 * wind_params.wind_final_velocity**2 * wind_params.wind_mass_loss_rate / V
+    dE_dt = 0.5 * wind_params.wind_final_velocities**2 * wind_params.wind_mass_loss_rates / V
 
     dp_dt = pressure_from_energy(dE_dt, updated_density, primitive_state[1, num_ghost_cells:num_injection_cells + num_ghost_cells], gamma)
 
@@ -406,7 +406,7 @@ def _wind_ei3D_radial(
     return primitive_state
 
 
-@jaxtyped(typechecker=typechecker)
+# @jaxtyped(typechecker=typechecker)
 @partial(jax.jit, static_argnames=['num_ghost_cells', 'num_injection_cells', 'registered_variables', 'config'])
 def _wind_ei3D(
     wind_params: WindParams,
@@ -456,6 +456,11 @@ def _wind_ei3D(
         mass_rates = wind_params.wind_mass_loss_rates  
         vel_scales = wind_params.wind_final_velocities 
 
+    mass_rates = jnp.asarray(mass_rates)
+    vel_scales = jnp.asarray(vel_scales)
+    if mass_rates.ndim == 0:
+        mass_rates = mass_rates.reshape((1,))
+        vel_scales = vel_scales.reshape((1,))
     # jax.debug.print("mass_rates: {m}", m=mass_rates)
     # jax.debug.print("vel_scales: {v}", v=vel_scales)
     # drho_dt_sources has shape (N, Nx, Ny, Nz); sum over sources   
@@ -478,6 +483,7 @@ def _wind_ei3D(
         primitive_state[registered_variables.velocity_index.x] ** 2
         + primitive_state[registered_variables.velocity_index.y] ** 2
         + primitive_state[registered_variables.velocity_index.z] ** 2
+        + 1e-20  # avoid zero velocity
     )
 
     dp_dt = pressure_from_energy(dE_dt, updated_density, u, gamma)
@@ -486,7 +492,7 @@ def _wind_ei3D(
 
     return primitive_state
 
-@jaxtyped(typechecker=typechecker)
+# @jaxtyped(typechecker=typechecker)
 @partial(jax.jit, static_argnames=['num_ghost_cells', 'num_injection_cells', 'registered_variables', 'config'])
 def _wind_ei3D_tsc(
     wind_params: WindParams,

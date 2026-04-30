@@ -18,7 +18,7 @@ from jf1uids.option_classes.simulation_params import SimulationParams
 from jf1uids._physics_modules._stellar_wind.stellar_wind import _wind_injection
 from jf1uids.shock_finder.shock_finder import shock_criteria
 
-@jaxtyped(typechecker=typechecker)
+# @jaxtyped(typechecker=typechecker)
 @partial(jax.jit, static_argnames=['config', 'registered_variables'])
 def _run_physics_modules(
     primitive_state: STATE_TYPE,
@@ -73,7 +73,10 @@ def _run_physics_modules(
         )
 
     if config.cooling_config.cooling:
-        primitive_state = update_pressure_by_cooling(primitive_state, registered_variables, config.cooling_config.cooling_curve_type, params, dt)
+        # jax.debug.print("DEBUG params: {table}", table=params.cooling_params)
+        # jax.debug.print("DEBUG config: {config}", config=config.cooling_config)     #this is passed correctly
+        # primitive_state = update_pressure_by_cooling(primitive_state, registered_variables, config.cooling_config.cooling_curve_config, params, dt)
+        primitive_state = update_pressure_by_cooling(primitive_state, registered_variables, config, params, dt)
 
     if config.neural_net_force_config.neural_net_force:
         primitive_state = _neural_net_force(
