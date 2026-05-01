@@ -31,54 +31,38 @@ The hydrodynamics are solved with a **modified version of `astronomix`** (former
 
 The upstream solver provides the differentiable finite-volume hydrodynamics core. On top of it, this work adds a CWB-specific physics layer and an observation-generation layer. The complete list of modifications relative to upstream `astronomix` is documented below.
 
-### Modifications introduced in this work
+### Modifications
 
 1. **Energy-and-mass wind injection sources.** Each star is represented as a point source with a spherical injection region of volume `V`. Mass is deposited at rate `Ṁₛ / V` and kinetic energy at rate `½ v²∞,ₛ Ṁₛ / V`. The momentum source then arises self-consistently through the induced pressure gradient, so no separate momentum injection term is required.
 
 2. **Two-step gravity coupling for a moving binary.**
-   - **Stars:** integrated with an explicit fourth-order Runge–Kutta N-body integrator. Gas gravity is neglected relative to the stellar masses.
-   - **Gas:** feels the stars through a Poisson solve in which the stellar masses are deposited onto the grid using a nearest-grid-point kernel each step.
+   - **Stars:** integrated with an explicit fourth-order Runge–Kutta N-body integrator. Gas gravity onto stars neglected relative to the stellar masses.
+   - **Gas:** feels the stars through a Poisson solve in which the stellar masses are deposited onto the grid using a nearest-grid-point (NGP) kernel each step.
    This couples the upstream hydro solver to a moving binary while keeping the gravitational sourcing consistent on the Eulerian grid.
 
 4. **Empirical mass ↔ mass-loss-rate coupling.** The sampled mass-loss rate `Ṁ` is mapped to a stellar mass `M ~ N(M₀(Ṁ), 0.05 M₀(Ṁ))` via an interpolated empirical relation derived from the rotating stellar-evolution grids of Ekström et al. (2012), with wind-parameter post-processing following Haid et al. (2018).
 
 5. **Hα emissivity post-processor.** A new module computes the Hα volume emissivity from the simulated `(ρ, P)` fields, assuming a fully photoionised H II region (cf. Green et al., 2019), via interpolation in a table from Osterbrock (1989):
    `j_Hα = 2.63·10⁻³³ · n_e n_H / T^0.9   [erg cm⁻³ s⁻¹ arcsec⁻²]`
-   with `n_e = 0.86 ρ/m_p`, `n_H = 0.71 ρ/m_p`, and the temperature obtained from the ideal gas law.
 
-6. **Line-of-sight projection (optically thin limit).** The 3D emissivity cube is integrated along the line of sight, `J = ∫ j_Hα dl`, to produce a 2D intensity map per snapshot.
+6. **Line-of-sight projection (optically thin limit).** The 3D emissivity cube is integrated along the line of sight, to produce a 2D intensity map per snapshot.
 
-7. **Detector / observation model.** Intensity is converted to expected photon counts using representative instrument parameters (`D = 2.4 m`, `A_ap = 0.04 arcsec²`, `t_exp = 600 s`, `η_tel = 0.11`), followed by a per-pixel noise model combining Poisson photon shot noise (`σ = √N`) and a flat-field calibration term with fractional amplitude `ε_flat = 0.01`. Noise is **resampled per snapshot, per epoch** during training, so each underlying simulation is seen with many independent noise realisations.
+7. **Detector / observation model.** Intensity is converted to expected photon counts using representative instrument parameters, followed by a per-pixel noise model. Noise is resampled per snapshot, per epoch during training.
 
-8. **Snapshot / time-series output.** Each run is configured to advance for `T_end = 5 yr` on an `N = 64³` Cartesian grid and emit **10 equally spaced snapshots** matched to the encoder's expected input shape `(T=10, H=64, W=64)`.
-
-9. **CWB-specific initial conditions.** Uniform ambient density `ρ₀ = 2 m_p cm⁻³` and temperature `T₀ = 15 000 K`, representative of the warm ionised ISM around massive binaries.
+8. **Snapshot / time-series output.** Each run is configured to advance for `T_end = 5 yr` on an `N = 64³` Cartesian grid and emit 10 equally spaced snapshots matched to the encoder's expected input shape
 
 ---
 
 ## Repository layout
 
-```
-.
-├── simulator/        # Modified astronomix + N-body integrator + wind/turbulence sources
-├── observation/      # Hα emissivity, line-of-sight projection, detector & noise model
-├── inference/        # Spatio-temporal CNN embedding + neural spline flow (NPE-C via sbi)
-├── hpo/              # Optuna NSGA-II hyperparameter search (validation NLL ⊕ TARP deviation)
-├── calibration/      # TARP and SBC diagnostics
-├── baselines/        # ABC rejection sampler with the 62-D hand-crafted summary
-├── scripts/          # Training, inference, and figure-reproduction entry points
-└── configs/          # Priors, simulator settings, network/flow hyperparameters
-```
+
 
 ## Pipeline at a glance
 
-1. **Sample** `θ ~ p(θ)` from the priors in the table above.
-2. **Simulate** with modified `astronomix` for 5 yr on a 64³ grid, dumping 10 snapshots.
-3. **Render** Hα emissivity, project along the line of sight, apply detector + noise model → `x ∈ ℝ^{10×64×64}`.
-4. **Embed** with a shared 2D CNN per frame → temporal 1D CNN → FC head.
-5. **Train** a neural spline flow `q_φ(θ | f_ψ(x))` jointly with the embedding, minimising the NPE-C loss on `~40 000` `(θᵢ, xᵢ)` pairs.
-6. **Evaluate** posterior calibration with TARP (joint) and SBC (marginal).
-
+1. Sample `θ ~ p(θ)` from the priors in the table above.
+2. Simulate with modified `astronomix` for 5 yr on a 64³ grid (dumping 10 snapshots), convert to Hα emissivity, project along the line of sight, convert to photon count (all in simulator.py + Halpha.py),
+3. Embed with a shared 2D CNN per frame → temporal 1D CNN → FC head;  optuna optimize; train a neural spline flow jointly with the embedding, minimising the NPE-C loss on `~40 000` `(θᵢ, xᵢ)` pairs; resample noise epoch wise
+5. Evaluate posterior calibration and plot.
 
 ## License & data
 
