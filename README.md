@@ -36,11 +36,9 @@ The upstream solver provides the differentiable finite-volume hydrodynamics core
 1. **Energy-and-mass wind injection sources.** Each star is represented as a point source with a spherical injection region of volume `V`. Mass is deposited at rate `Ṁₛ / V` and kinetic energy at rate `½ v²∞,ₛ Ṁₛ / V`. The momentum source then arises self-consistently through the induced pressure gradient, so no separate momentum injection term is required.
 
 2. **Two-step gravity coupling for a moving binary.**
-   - **Stars:** integrated with an explicit fourth-order Runge–Kutta N-body integrator. Gas self-gravity is neglected relative to the stellar masses.
+   - **Stars:** integrated with an explicit fourth-order Runge–Kutta N-body integrator. Gas gravity is neglected relative to the stellar masses.
    - **Gas:** feels the stars through a Poisson solve in which the stellar masses are deposited onto the grid using a nearest-grid-point kernel each step.
    This couples the upstream hydro solver to a moving binary while keeping the gravitational sourcing consistent on the Eulerian grid.
-
-3. **Forced random turbulence parameterised by `η`.** A driven turbulence scheme adopted and modified from Seo & Ryu (2023, [DOI](https://doi.org/10.3847/1538-4357/acdf4b)) is added, with amplitude controlled by the dimensionless parameter `η = Ė_turb / ⟨L_wind⟩` — the fraction of additional forced turbulence relative to the mean injected wind luminosity.
 
 4. **Empirical mass ↔ mass-loss-rate coupling.** The sampled mass-loss rate `Ṁ` is mapped to a stellar mass `M ~ N(M₀(Ṁ), 0.05 M₀(Ṁ))` via an interpolated empirical relation derived from the rotating stellar-evolution grids of Ekström et al. (2012), with wind-parameter post-processing following Haid et al. (2018).
 
@@ -81,33 +79,10 @@ The upstream solver provides the differentiable finite-volume hydrodynamics core
 5. **Train** a neural spline flow `q_φ(θ | f_ψ(x))` jointly with the embedding, minimising the NPE-C loss on `~40 000` `(θᵢ, xᵢ)` pairs.
 6. **Evaluate** posterior calibration with TARP (joint) and SBC (marginal).
 
-## Reproducing the paper
-
-The selected hyperparameters from the 128-trial Optuna NSGA-II Pareto search (jointly minimising validation NLL and mean TARP deviation) are:
-
-| Hyperparameter | Value |
-|---|---|
-| Conv blocks `L` | 3 |
-| Base channels `C₁` | 32 |
-| Final FC width `d_fc` | 128 |
-| Temporal layers `L_t` | 2 |
-| Temporal first-layer stride `s_t` | 1 |
-| Temporal pool bins `T_out` | 2 |
-| Flow transforms `N_tr` | 20 |
-| Flow hidden features `H_flow` | 7 |
-
-Reference run: `40 000` training simulations, `1 000` held-out test simulations, single NVIDIA H200 GPU (≈ 4 100 simulations/day).
-
-## Requirements
-
-- Python ≥ 3.10
-- JAX (with a CUDA-enabled build for GPU runs)
-- A modified copy of `astronomix` (vendored / pinned in `simulator/`)
-- [`sbi`](https://github.com/sbi-dev/sbi) (Boelts et al., 2025), PyTorch, Optuna, NumPy, SciPy, Matplotlib
 
 ## License & data
 
-Code is released for **review purposes only** under this anonymous repository. A permissive open-source license, full Zenodo data release of the `40 000` simulation set, and links to the de-anonymised repository will accompany publication.
+Code is released for review purposes only under this anonymous repository. Links to the de-anonymised repository will accompany publication.
 
 ## Key references
 
