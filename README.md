@@ -95,6 +95,4 @@ Code is released for review purposes only under this anonymous repository. Links
 - Lemos, P. et al. *Sampling-based accuracy testing of posterior estimators (TARP).* [arXiv:2302.03026](https://arxiv.org/abs/2302.03026) (2023).
 - Osterbrock, D. E. *Astrophysics of Gaseous Nebulae and Active Galactic Nuclei* (1989).
 - Seo, J. & Ryu, D. *HOW-MHD: A High-Order WENO-Based MHD Code…* ApJ 953(1):39 (2023).
-- Storcks, L. *astronomix — differentiable MHD in JAX.* Zenodo (2025), [10.5281/zenodo.17782162](https://zenodo.org/doi/10.5281/zenodo.17782162).
-- Storcks, L. & Buck, T. *jf1uids — differentiable conservative radially symmetric fluid simulations and stellar winds.* [arXiv:2410.23093](https://arxiv.org/abs/2410.23093) (2024).
 - Talts, S. et al. *Validating Bayesian inference algorithms with simulation-based calibration.* [arXiv:1804.06788](https://arxiv.org/abs/1804.06788) (2018).
