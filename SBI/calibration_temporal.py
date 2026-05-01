@@ -104,7 +104,7 @@ prior = BoxUniform(
     device=device
 )    
 
-num_tarp_samples = 2000  # choose a number of sbc runs
+num_tarp_samples = 2000  
 
 for i in [0,1,2,3]:
     print("min/max theta {i}: ", min(theta[:,i]), max(theta[:,i]))
@@ -153,7 +153,7 @@ log2 = False    # whether to apply exp to the first two params for plotting (if 
 to_real_units = True  # whether to convert from code units to physical units for plotting
 
 Number_of_datapoints = 200
-first_index = 200
+first_index = 0
 
 
 for i in range(first_index, first_index + Number_of_datapoints):  #theta.shape[0]):
@@ -285,8 +285,6 @@ p_std_arr = np.stack(p_std, axis=0)
 
 print("Params.png saved")
 
-
-
 # --- Percentile-Percentile ---
 
 num_ppp = x.shape[0]  #1000                    # number of held-out examples (matches the earlier loop)
@@ -330,8 +328,6 @@ plt.savefig(save_path + "/pp_marginal_posterior_full_c.png", dpi=150)
 plt.clf()
 print("Saved pp_marginal_posterior_2log_opti.png")
 
-
-
 # Kolmogorov-Smirnov test against Uniform(0,1) for each marginal
 for j in range(plot_num):
     ks_stat, ks_p = kstest(percentiles[j, :], 'uniform')
@@ -341,7 +337,7 @@ for j in range(plot_num):
 
 # If `percentiles` not already computed by your PP code, compute it (all N examples)
 try:
-    percentiles  # noqa: B018
+    percentiles  # 
 except NameError:
     N = int(theta.shape[0])
     M = 2000
@@ -458,313 +454,5 @@ f, ax = sbc_rank_plot(
 )
 
 plt.tight_layout()
-# plt.savefig(save_path + "/SBC_plot_full_400.png", dpi=250)
+plt.savefig(save_path + "/SBC_plot_full.png", dpi=250)
 plt.clf()
-
-import json
-# ============================================================================
-# TARP METRICS (IMPROVED: Keep essentials, drop KS p-value)
-# ============================================================================
-
-ecp_np = ecp.numpy() if isinstance(ecp, torch.Tensor) else ecp
-alpha_np = alpha.numpy() if isinstance(alpha, torch.Tensor) else alpha
-
-# Integrated calibration metrics
-mad_tarp = np.mean(np.abs(ecp_np - alpha_np))
-msd_tarp = np.mean(ecp_np - alpha_np)
-max_dev_tarp = np.max(np.abs(ecp_np - alpha_np))
-
-# Specific credibility levels (narratively useful)
-idx_68 = np.argmin(np.abs(alpha_np - 0.68))
-idx_95 = np.argmin(np.abs(alpha_np - 0.95))
-dev_68 = ecp_np[idx_68] - alpha_np[idx_68]
-dev_95 = ecp_np[idx_95] - alpha_np[idx_95]
-
-print("\n" + "="*70)
-print("TARP CALIBRATION SUMMARY")
-print("="*70)
-print(f"Mean Absolute Deviation (MAD):      {mad_tarp:.4f}")
-print(f"  ↳ Integrated error across all credibility levels")
-print(f"Mean Signed Deviation (bias):       {msd_tarp:+.4f}")
-print(f"  ↳ Positive = conservative; negative = overconfident")
-print(f"Max Absolute Deviation:             {max_dev_tarp:.4f}")
-print(f"Average Test Coverage (ATC):        {atc:.4f} (ideal: 0)")
-print(f"Deviation @ 68% credibility:        {dev_68:+.4f}")
-print(f"Deviation @ 95% credibility:        {dev_95:+.4f}")
-
-# Store for later use
-tarp_metrics = {
-    "mad": mad_tarp,
-    "msd": msd_tarp,
-    "max_dev": max_dev_tarp,
-    "atc": atc,
-    "dev_68": dev_68,
-    "dev_95": dev_95,
-}
-
-print("\n✓ TARP: Report MAD + ATC + deviations @ 68%/95%")
-print("  (Skip KS p-value; it's not informative for ECPD curves)\n")
-
-# ============================================================================
-# SBC METRICS (IMPROVED: CDF-aware, effect-size focused)
-# ============================================================================
-
-ranks_np = ranks.numpy() if isinstance(ranks, torch.Tensor) else ranks
-if ranks_np.shape[0] != 7:  # if first dim is not params, transpose
-    ranks_np = ranks_np.T
-num_params = ranks_np.shape[0]
-num_sbc_samples = ranks_np.shape[1]
-
-ranks_normalized = ranks_np / (num_posterior_samples + 1)
-
-param_labels = [
-    r"$\log\dot{M}_1$",
-    r"$\log\dot{M}_2$",
-    r"$v_{\infty,1}$",
-    r"$v_{\infty,2}$",
-    r"$e$",
-    r"$\cos(i)$",
-    r"$\eta$"
-]
-
-# Expected rank statistics under perfect calibration
-expected_rank_mean = (num_posterior_samples + 1) / 2
-expected_rank_std = np.sqrt((num_posterior_samples + 1) ** 2 / 12)
-
-def cramer_von_mises(ranks_norm):
-    """
-    Cramér-von Mises statistic: integrated squared distance from uniform CDF.
-    
-    Good calibration: CvM < 0.05
-    Acceptable: CvM < 0.15
-    Concerning: CvM > 0.30
-    
-    This captures global CDF shape, not just worst single point (unlike KS).
-    """
-    sorted_ranks = np.sort(ranks_norm)
-    n = len(sorted_ranks)
-    empirical_cdf = np.arange(1, n + 1) / n
-    theoretical_cdf = sorted_ranks
-    
-    cvm = np.mean((empirical_cdf - theoretical_cdf) ** 2)
-    return cvm
-
-def anderson_darling(ranks_norm):
-    """
-    Anderson-Darling statistic: tail-weighted CDF distance.
-    Detects when true parameters cluster at posterior extremes.
-    
-    Good calibration: A² < 2.0
-    Acceptable: A² < 5.0
-    Concerning: A² > 10.0
-    """
-    sorted_ranks = np.sort(ranks_norm)
-    n = len(sorted_ranks)
-    empirical_cdf = np.arange(1, n + 1) / n
-    theoretical_cdf = sorted_ranks
-    
-    # Weight by 1/(F(1-F)) to emphasize tails
-    weights = 1.0 / (theoretical_cdf * (1 - theoretical_cdf) + 1e-8)
-    ad = np.mean(weights * (empirical_cdf - theoretical_cdf) ** 2)
-    return ad
-
-print("="*80)
-print("SBC CALIBRATION SUMMARY (Empirical CDF vs. Diagonal)")
-print("="*80)
-print(f"{'Parameter':<18} {'KS dist':<10} {'CvM':<10} {'A²':<10} "
-      f"{'Rank μ':<10} {'Rank σ':<10}")
-print("-" * 80)
-
-sbc_ks_stats = []
-sbc_cvm_stats = []
-sbc_ad_stats = []
-sbc_rank_means = []
-sbc_rank_stds = []
-sbc_rank_mean_bias = []
-sbc_rank_std_bias = []
-
-for j in range(num_params):
-    # KS statistic (effect size, not p-value)
-    ks_stat, _ = kstest(ranks_normalized[j], 'uniform')
-    
-    # Cramér-von Mises (global CDF shape)
-    cvm = cramer_von_mises(ranks_normalized[j])
-    
-    # Anderson-Darling (tail-sensitive)
-    ad = anderson_darling(ranks_normalized[j])
-    
-    # Rank statistics
-    rank_mean = np.mean(ranks_np[j])
-    rank_std = np.std(ranks_np[j])
-    rank_mean_bias = rank_mean - expected_rank_mean
-    rank_std_bias = rank_std - expected_rank_std
-    
-    sbc_ks_stats.append(ks_stat)
-    sbc_cvm_stats.append(cvm)
-    sbc_ad_stats.append(ad)
-    sbc_rank_means.append(rank_mean)
-    sbc_rank_stds.append(rank_std)
-    sbc_rank_mean_bias.append(rank_mean_bias)
-    sbc_rank_std_bias.append(rank_std_bias)
-    
-    print(f"{param_labels[j]:<18} {ks_stat:<10.4f} {cvm:<10.4f} {ad:<10.4f} "
-          f"{rank_mean:<10.1f} {rank_std:<10.1f}")
-
-print("\n" + "-" * 80)
-print("DIAGNOSTIC: Rank Bias Summary")
-print("-" * 80)
-print(f"{'Parameter':<18} {'Mean Bias':<12} {'Interpretation':<50}")
-print("-" * 80)
-
-for j in range(num_params):
-    mean_bias_pct = 100 * sbc_rank_mean_bias[j] / expected_rank_mean
-    
-    if abs(mean_bias_pct) < 5:
-        interpretation = "Well-centered ✓"
-    elif mean_bias_pct > 0:
-        interpretation = f"Conservative ({mean_bias_pct:+.1f}% wide posteriors)"
-    else:
-        interpretation = f"Overconfident ({mean_bias_pct:+.1f}% narrow posteriors)"
-    
-    print(f"{param_labels[j]:<18} {sbc_rank_mean_bias[j]:>+8.1f}          "
-          f"{interpretation:<50}")
-
-# Calibration quality summary
-good_cvm = sum(1 for x in sbc_cvm_stats if x < 0.05)
-acceptable_cvm = sum(1 for x in sbc_cvm_stats if x < 0.15)
-
-print("\n" + "-" * 80)
-print("SUMMARY")
-print("-" * 80)
-print(f"CvM < 0.05 (excellent):  {good_cvm}/{num_params} parameters")
-print(f"CvM < 0.15 (acceptable): {acceptable_cvm}/{num_params} parameters")
-
-if acceptable_cvm == num_params:
-    print("→ Overall: All parameters well-calibrated ✓\n")
-elif acceptable_cvm >= num_params - 1:
-    print("→ Overall: Minor calibration issues in 1 parameter\n")
-else:
-    print(f"→ Overall: Calibration issues in {num_params - acceptable_cvm} parameters\n")
-
-# Package metrics for JSON export
-sbc_metrics = {
-    "ks_statistics": [float(x) for x in sbc_ks_stats],
-    "cramer_von_mises": [float(x) for x in sbc_cvm_stats],
-    "anderson_darling": [float(x) for x in sbc_ad_stats],
-    "rank_means": [float(x) for x in sbc_rank_means],
-    "rank_stds": [float(x) for x in sbc_rank_stds],
-    "rank_mean_bias": [float(x) for x in sbc_rank_mean_bias],
-    "rank_std_bias": [float(x) for x in sbc_rank_std_bias],
-    "num_posterior_samples": int(num_posterior_samples),
-    "num_sbc_samples": int(num_sbc_samples),
-}
-
-# ============================================================================
-# (Optional) MARGINAL PP-PLOTS, if percentiles were computed
-# ============================================================================
-
-print("\n" + "="*70)
-print("MARGINAL PP-PLOT SUMMARY (if percentiles computed)")
-print("="*70)
-
-try:
-    percentiles_np = percentiles.numpy() if isinstance(percentiles, torch.Tensor) else percentiles
-    
-    pp_ks_stats = []
-    pp_cvm_stats = []
-    
-    print(f"{'Parameter':<18} {'KS dist':<10} {'CvM':<10}")
-    print("-" * 40)
-    
-    for j in range(num_params):
-        ks_stat, _ = kstest(percentiles_np[j], 'uniform')
-        cvm = cramer_von_mises(percentiles_np[j])
-        pp_ks_stats.append(ks_stat)
-        pp_cvm_stats.append(cvm)
-        print(f"{param_labels[j]:<18} {ks_stat:<10.4f} {cvm:<10.4f}")
-    
-    pp_metrics = {
-        "ks_statistics": [float(x) for x in pp_ks_stats],
-        "cramer_von_mises": [float(x) for x in pp_cvm_stats],
-    }
-except NameError:
-    print("(percentiles not computed in this run; skip this section)")
-    pp_metrics = {}
-
-# ============================================================================
-# POINT-ESTIMATE QUALITY (if available from earlier analysis)
-# ============================================================================
-
-print("\n" + "="*70)
-print("POINT-ESTIMATE QUALITY SUMMARY")
-print("="*70)
-
-if 'p_true' in locals() and 'p_mean' in locals():
-    p_true_arr = np.stack(p_true, axis=0)
-    p_mean_arr = np.stack(p_mean, axis=0)
-    p_std_arr = np.stack(p_std, axis=0)
-    
-    print(f"{'Parameter':<18} {'RMSE':<15} {'Median σ':<15} {'% in 1σ':<12}")
-    print("-" * 60)
-    
-    rmse_values = []
-    median_widths = []
-    coverage_1sigma = []
-    
-    for j in range(num_params):
-        rmse = np.sqrt(np.mean((p_true_arr[:, j] - p_mean_arr[:, j]) ** 2))
-        median_width = np.median(p_std_arr[:, j])
-        within_1sigma = np.mean(
-            np.abs(p_true_arr[:, j] - p_mean_arr[:, j]) <= p_std_arr[:, j]
-        )
-        
-        rmse_values.append(rmse)
-        median_widths.append(median_width)
-        coverage_1sigma.append(within_1sigma)
-        
-        print(f"{param_labels[j]:<18} {rmse:<15.3e} {median_width:<15.3e} "
-              f"{within_1sigma*100:<12.1f}%")
-    
-    pe_metrics = {
-        "rmse": rmse_values,
-        "median_widths": median_widths,
-        "coverage_1sigma": coverage_1sigma,
-    }
-else:
-    print("(Point-estimate metrics not available)")
-    pe_metrics = {}
-
-# ============================================================================
-# SAVE ALL METRICS TO JSON
-# ============================================================================
-
-all_metrics = {
-    "tarp": tarp_metrics,
-    "sbc": sbc_metrics,
-    "pp": pp_metrics,
-    "point_estimates": pe_metrics,
-}
-
-with open("calibration_metrics_improved.json", "w") as f:
-    def convert_to_serializable(obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, (np.floating, np.integer)):
-            return float(obj)
-        elif isinstance(obj, dict):
-            return {k: convert_to_serializable(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [convert_to_serializable(item) for item in obj]
-        return obj
-    
-    json.dump(convert_to_serializable(all_metrics), f, indent=2)
-
-print("\n" + "="*70)
-print("✓ All calibration metrics saved to: calibration_metrics_improved.json")
-print("="*70)
-print("\nKEY THRESHOLDS FOR INTERPRETATION:")
-print("  KS distance:   < 0.08 (excellent), < 0.15 (acceptable)")
-print("  Cramér-von Mises: < 0.05 (excellent), < 0.15 (acceptable)")
-print("  Anderson-Darling: < 2.0 (excellent), < 5.0 (acceptable)")
-print("  Rank mean bias: < ±5% (excellent), < ±15% (acceptable)")
-print("\nSee accompanying SBC_metrics_guide.md for detailed interpretation.\n")
