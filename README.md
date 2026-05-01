@@ -8,16 +8,9 @@
 ## Overview
 
 This repository contains the full pipeline used to perform amortized **simulation-based inference (SBI)** of colliding-wind binary (CWB) parameters from short Hα photon-count time series. Given a 10-frame, 64×64 noisy Hα image cube of a CWB, the trained model returns an approximate posterior over seven physical parameters:
+ `Ṁ₁`, `Ṁ₂` (mass-loss rates), `v∞,₁`, `v∞,₂` (Terminal wind velocities), `e` (Orbital eccentricity), `i` (Inclination), `η` (Turbulence-to-wind luminosity ratio)
 
-| Symbol | Meaning | Prior |
-|---|---|---|
-| `Ṁ₁`, `Ṁ₂` | Individual mass-loss rates [M☉/yr] | log-uniform, 8·10⁻⁹ – 10⁻⁵ |
-| `v∞,₁`, `v∞,₂` | Terminal wind velocities [km/s] | uniform, 1200 – 3200 |
-| `e` | Orbital eccentricity | uniform, 0 – 0.85 |
-| `i` | Inclination [deg] | isotropic, 0 – 90 |
-| `η` | Turbulence-to-wind luminosity ratio | uniform, 0 – 0.025 |
-
-The pipeline consists of four stages: (i) a 3D differentiable hydrodynamics + N-body forward simulator, (ii) an Hα emissivity and detector-noise pipeline that produces synthetic photon-count maps, (iii) a factorised spatio-temporal CNN embedding, and (iv) a neural spline flow trained with **NPE-C** (Greenberg et al., 2019) using the [`sbi`](https://github.com/sbi-dev/sbi) toolkit (Boelts et al., 2025).
+The pipeline consists of four stages: (i) a 3D differentiable hydrodynamics + N-body forward simulator, (ii) an Hα emissivity and detector-noise pipeline that produces synthetic photon-count maps, (iii) a factorised spatio-temporal CNN embedding, and (iv) a neural spline flow trained with NPE-C (Greenberg et al., 2019) using the [`sbi`](https://github.com/sbi-dev/sbi) toolkit (Boelts et al., 2025).
 
 ---
 
