@@ -2,7 +2,7 @@
 name = "jf1uids"
 version = "0.2.7"
 description = "differentiable (magneto)hydrodynamics for astrophysics in JAX"
-authors = [""]
+authors = ["Leonard Storcks"]
 readme = "README.md"
 packages = [{include = "jf1uids"}]
 
