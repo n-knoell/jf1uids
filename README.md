@@ -26,8 +26,8 @@ The pipeline consists of four stages: (i) a 3D differentiable hydrodynamics + N-
 The hydrodynamics are solved with a **modified version of `astronomix`** (formerly `jf1uids`), a JAX-based, auto-differentiable, conservative finite-volume fluid solver.
 
 **Upstream references:**
-- Storcks, L. *astronomix — differentiable MHD in JAX*. Zenodo (2025). DOI: [10.5281/zenodo.17782162](https://zenodo.org/doi/10.5281/zenodo.17782162)
-- Storcks, L. & Buck, T. *Differentiable conservative radially symmetric fluid simulations and stellar winds — jf1uids* (2024). [arXiv:2410.23093](https://arxiv.org/abs/2410.23093)
+- *astronomix — differentiable MHD in JAX*. Zenodo (2025). DOI: [10.5281/zenodo.17782162](https://zenodo.org/doi/10.5281/zenodo.17782162)
+- *Differentiable conservative radially symmetric fluid simulations and stellar winds — jf1uids* (2024). [arXiv:2410.23093](https://arxiv.org/abs/2410.23093)
 
 The upstream solver provides the differentiable finite-volume hydrodynamics core. On top of it, this work adds a CWB-specific physics layer and an observation-generation layer. The complete list of modifications relative to upstream `astronomix` is documented below.
 
