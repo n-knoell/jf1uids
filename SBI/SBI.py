@@ -15,7 +15,6 @@ from Halpha import project_theta_pi2_fast
 from Halpha import build_j_map
 from Halpha import sb_to_photons_code, add_detector_noise_jax
 
-# SBI training script
 import torch
 import pickle
 from sbi.inference import NPE
