@@ -25,21 +25,19 @@ The upstream solver provides the differentiable finite-volume hydrodynamics core
 
 ### Modifications
 
-1. **Energy-and-mass wind injection sources.** Each star is represented as a point source with a spherical injection region of volume `V`. Mass is deposited at rate `Ṁₛ / V` and kinetic energy at rate `½ v²∞,ₛ Ṁₛ / V`. The momentum source then arises self-consistently through the induced pressure gradient, so no separate momentum injection term is required.
-
-2. **Two-step gravity coupling for a moving binary.**
+1. **Two-step gravity coupling for a moving binary.**
    - **Stars:** integrated with an explicit fourth-order Runge–Kutta N-body integrator. Gas gravity onto stars neglected relative to the stellar masses.
    - **Gas:** feels the stars through a Poisson solve in which the stellar masses are deposited onto the grid using a nearest-grid-point (NGP) kernel each step.
    This couples the upstream hydro solver to a moving binary while keeping the gravitational sourcing consistent on the Eulerian grid.
 
-4. **Empirical mass ↔ mass-loss-rate coupling.** The sampled mass-loss rate `Ṁ` is mapped to a stellar mass `M ~ N(M₀(Ṁ), 0.05 M₀(Ṁ))` via an interpolated empirical relation derived from the rotating stellar-evolution grids of Ekström et al. (2012), with wind-parameter post-processing following Haid et al. (2018).
+2. **Empirical mass ↔ mass-loss-rate coupling.** The sampled mass-loss rate `Ṁ` is mapped to a stellar mass `M ~ N(M₀(Ṁ), 0.05 M₀(Ṁ))` via an interpolated empirical relation derived from the rotating stellar-evolution grids of Ekström et al. (2012), with wind-parameter post-processing following Haid et al. (2018).
 
-5. **Hα emissivity post-processor.** A new module computes the Hα volume emissivity from the simulated `(ρ, P)` fields, assuming a fully photoionised H II region (cf. Green et al., 2019), via interpolation in a table from Osterbrock (1989):
+3. **Hα emissivity post-processor.** A new module computes the Hα volume emissivity from the simulated `(ρ, P)` fields, assuming a fully photoionised H II region (cf. Green et al., 2019), via interpolation in a table from Osterbrock (1989):
    `j_Hα = 2.63·10⁻³³ · n_e n_H / T^0.9   [erg cm⁻³ s⁻¹ arcsec⁻²]`
 
-6. **Line-of-sight projection (optically thin limit).** The 3D emissivity cube is integrated along the line of sight, to produce a 2D intensity map per snapshot.
+4. **Line-of-sight projection (optically thin limit).** The 3D emissivity cube is integrated along the line of sight, to produce a 2D intensity map per snapshot.
 
-7. **Detector / observation model.** Intensity is converted to expected photon counts using representative instrument parameters, followed by a per-pixel noise model. Noise is resampled per snapshot, per epoch during training.
+5. **Detector / observation model.** Intensity is converted to expected photon counts using representative instrument parameters, followed by a per-pixel noise model. Noise is resampled per snapshot, per epoch during training.
 
 ---
 
