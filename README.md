@@ -1,7 +1,6 @@
 # Neural Posterior Estimation of Colliding-Wind Binary Parameters from Hα Time Series
 
 > ⚠️ **Anonymous repository for double-blind peer review.**
-> This repository hosts the code accompanying the paper *"Neural Posterior Estimation of Colliding-Wind Binary Parameters from Hα Time Series"*, submitted to the **AI4Physics Workshop at ICML 2026**. All identifying information (authors, affiliations, links to non-anonymous code or data) has been removed for the duration of the review process. A non-anonymous, citable release will replace this repository upon acceptance.
 
 ---
 
@@ -42,24 +41,11 @@ The upstream solver provides the differentiable finite-volume hydrodynamics core
 
 7. **Detector / observation model.** Intensity is converted to expected photon counts using representative instrument parameters, followed by a per-pixel noise model. Noise is resampled per snapshot, per epoch during training.
 
-8. **Snapshot / time-series output.** Each run is configured to advance for `T_end = 5 yr` on an `N = 64³` Cartesian grid and emit 10 equally spaced snapshots matched to the encoder's expected input shape
-
 ---
-
-## Repository layout
-
-
-
-## Pipeline at a glance
-
-1. Sample `θ ~ p(θ)` from the priors in the table above.
-2. Simulate with modified `astronomix` for 5 yr on a 64³ grid (dumping 10 snapshots), convert to Hα emissivity, project along the line of sight, convert to photon count (all in simulator.py + Halpha.py),
-3. Embed with a shared 2D CNN per frame → temporal 1D CNN → FC head;  optuna optimize; train a neural spline flow jointly with the embedding, minimising the NPE-C loss on `~40 000` `(θᵢ, xᵢ)` pairs; resample noise epoch wise
-5. Evaluate posterior calibration and plot.
 
 ## License & data
 
-Code is released for review purposes only under this anonymous repository. Links to the de-anonymised repository will accompany publication.
+Code is released for review purposes only under this anonymous repository.
 
 ## Key references
 
