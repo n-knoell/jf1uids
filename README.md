@@ -26,8 +26,8 @@ The upstream solver provides the differentiable finite-volume hydrodynamics core
 ### Modifications
 
 1. **Two-step gravity coupling for a moving binary.**
-   - **Stars:** integrated with an explicit fourth-order Runge–Kutta N-body integrator. Gas gravity onto stars neglected relative to the stellar masses.
-   - **Gas:** feels the stars through a Poisson solve in which the stellar masses are deposited onto the grid using a nearest-grid-point (NGP) kernel each step.
+   - Stars: integrated with an explicit fourth-order Runge–Kutta N-body integrator. Gas gravity onto stars neglected relative to the stellar masses.
+   - Gas: feels the stars through a Poisson solve in which the stellar masses are deposited onto the grid using a nearest-grid-point (NGP) kernel each step.
    This couples the upstream hydro solver to a moving binary while keeping the gravitational sourcing consistent on the Eulerian grid.
 
 2. **Empirical mass ↔ mass-loss-rate coupling.** The sampled mass-loss rate `Ṁ` is mapped to a stellar mass `M ~ N(M₀(Ṁ), 0.05 M₀(Ṁ))` via an interpolated empirical relation derived from the rotating stellar-evolution grids of Ekström et al. (2012), with wind-parameter post-processing following Haid et al. (2018).
