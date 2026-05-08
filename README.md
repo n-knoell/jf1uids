@@ -20,7 +20,7 @@ The hydrodynamics are solved with a **modified version of `astronomix`**, a JAX-
 **References:**
 - *astronomix — differentiable MHD in JAX*. Zenodo (2025). DOI: [10.5281/zenodo.17782162](https://zenodo.org/doi/10.5281/zenodo.17782162)
 
-The upstream solver provides the differentiable finite-volume hydrodynamics core. The complete list of modifications relative to upstream `astronomix` is documented below.
+The upstream solver provides the differentiable finite-volume hydrodynamics core. The complete list of modifications to `astronomix` is documented below.
 
 ### Modifications
 
