@@ -1,4 +1,4 @@
-# Neural Posterior Estimation of Colliding-Wind Binary Parameters from Hα Time Series
+# Neural Posterior Estimation of Colliding-Wind Binary Parameters from Short, Noisy Hα Time Series
 
 ---
 
