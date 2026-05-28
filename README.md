@@ -1,7 +1,5 @@
 # Neural Posterior Estimation of Colliding-Wind Binary Parameters from Hα Time Series
 
-> ⚠️ **Anonymous repository for double-blind peer review.**
-
 ---
 
 ## Overview
@@ -40,9 +38,6 @@ The upstream solver provides the differentiable finite-volume hydrodynamics core
 
 ---
 
-## License & data
-
-Code is released for review purposes only under this anonymous repository.
 
 ## Key references
 
